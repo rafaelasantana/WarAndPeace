@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using WarAndPeace.Core.Models;
 
@@ -6,50 +5,61 @@ namespace WarAndPeace.Core.Processing
 {
     public static class ParallelProcessor
     {
-        // Configuration function
-        private static readonly Func<int?, ParallelOptions> CreateParallelOptions =
-            maxDegreeOfParallelism => new ParallelOptions 
-            { 
-                MaxDegreeOfParallelism = maxDegreeOfParallelism ?? Environment.ProcessorCount 
+        // Pure configuration functions
+        private static readonly Func<int?, int> DetermineParallelism =
+            maxDegree => maxDegree ?? Environment.ProcessorCount;
+            
+        private static readonly Func<int, ParallelOptions> CreateParallelOptions =
+            parallelism => new ParallelOptions { MaxDegreeOfParallelism = parallelism };
+
+        // Pure data transformation functions
+        private static readonly Func<TextChunk, Task<ImmutableHashSet<string>>> ProcessChunkAsync =
+            async chunk => (await Task.Run(() => 
+                WordTokenizer.Tokenize(chunk.Content))).ToImmutableHashSet();
+
+        private static readonly Func<ImmutableArray<ImmutableHashSet<string>>, ImmutableList<string>> CombineResults =
+            sets => sets
+                .Aggregate(
+                    ImmutableHashSet<string>.Empty,
+                    (acc, curr) => acc.Union(curr))
+                .OrderBy(word => word)
+                .ToImmutableList();
+
+        // Time measurement as pure transformation
+        private readonly record struct TimeFrame(DateTime Start, DateTime End)
+        {
+            public double ElapsedMilliseconds => (End - Start).TotalMilliseconds;
+        }
+
+        private static readonly Func<TimeFrame, ImmutableList<string>, ProcessingResult> CreateResult =
+            (timeFrame, words) => new ProcessingResult
+            {
+                UniqueWords = words,
+                ProcessingTimeMs = timeFrame.ElapsedMilliseconds,
+                TotalUniqueWords = words.Count
             };
-
-        // Core processing functions
-        private static readonly Func<TextChunk, IEnumerable<string>> ProcessChunk =
-            chunk => WordTokenizer.Tokenize(chunk.Content);
-
-        private static readonly Func<IEnumerable<string>, ImmutableHashSet<string>> ToImmutableSet =
-            words => words.ToImmutableHashSet();
-
-        // Timing function
-        private static readonly Func<DateTime, DateTime, double> CalculateProcessingTime =
-            (start, end) => (end - start).TotalMilliseconds;
 
         // Main processing pipeline
         public static async Task<ProcessingResult> ProcessChunksAsync(
-            IEnumerable<TextChunk> chunks,
+            IEnumerable<TextChunk>? chunks,
             int? maxDegreeOfParallelism = null)
         {
-            var startTime = DateTime.UtcNow;
+            if (chunks is null) return CreateEmptyResult();
+
+            var timeFrame = new TimeFrame(DateTime.UtcNow, DateTime.MinValue);
             
             try
             {
-                var parallelOptions = CreateParallelOptions(maxDegreeOfParallelism);
-                var chunksArray = chunks.ToImmutableArray();
+                var parallelism = DetermineParallelism(maxDegreeOfParallelism);
+                CreateParallelOptions(parallelism);
+                var immutableChunks = chunks.ToImmutableArray();
 
-                // Process chunks in parallel and collect results
-                var processedSets = await ProcessChunksParallel(chunksArray, parallelOptions);
+                var processedSets = await ProcessChunksParallelAsync(immutableChunks);
+                var uniqueWords = CombineResults(processedSets);
                 
-                // Combine results
-                var uniqueWords = CombineAndSortResults(processedSets);
+                timeFrame = timeFrame with { End = DateTime.UtcNow };
                 
-                var endTime = DateTime.UtcNow;
-                
-                return new ProcessingResult
-                {
-                    UniqueWords = uniqueWords,
-                    ProcessingTimeMs = CalculateProcessingTime(startTime, endTime),
-                    TotalUniqueWords = uniqueWords.Count
-                };
+                return CreateResult(timeFrame, uniqueWords);
             }
             catch (Exception ex)
             {
@@ -57,33 +67,23 @@ namespace WarAndPeace.Core.Processing
             }
         }
 
-        // Helper functions for parallel processing
-        private static async Task<ImmutableArray<ImmutableHashSet<string>>> ProcessChunksParallel(
-            ImmutableArray<TextChunk> chunks,
-            ParallelOptions parallelOptions)
+        // Helper functions
+        private static async Task<ImmutableArray<ImmutableHashSet<string>>> ProcessChunksParallelAsync(
+            ImmutableArray<TextChunk> chunks)
         {
-            var results = new ConcurrentBag<ImmutableHashSet<string>>();
+            var processingTasks = chunks
+                .Select(chunk => ProcessChunkAsync(chunk))
+                .ToImmutableArray();
 
-            await Parallel.ForEachAsync(
-                chunks,
-                parallelOptions,
-                async (chunk, _) =>
-                {
-                    var processed = await Task.Run(() => 
-                        ToImmutableSet(ProcessChunk(chunk)));
-                    results.Add(processed);
-                });
-
+            var results = await Task.WhenAll(processingTasks);
             return [..results];
         }
 
-        private static ImmutableList<string> CombineAndSortResults(
-            ImmutableArray<ImmutableHashSet<string>> processedSets) =>
-            processedSets
-                .Aggregate(
-                    ImmutableHashSet<string>.Empty,
-                    (acc, curr) => acc.Union(curr))
-                .OrderBy(word => word)
-                .ToImmutableList();
+        private static ProcessingResult CreateEmptyResult() => new()
+        {
+            UniqueWords = ImmutableList<string>.Empty,
+            ProcessingTimeMs = 0,
+            TotalUniqueWords = 0
+        };
     }
 }

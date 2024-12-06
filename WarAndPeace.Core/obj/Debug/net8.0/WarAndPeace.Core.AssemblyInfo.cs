@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WarAndPeace.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+15070c8e6546da0d5dc4dd2872aaf1d5c5c2f6c0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+597378dbc92cbc9a4834807cf2ed58f69b7d542a")]
 [assembly: System.Reflection.AssemblyProductAttribute("WarAndPeace.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WarAndPeace.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
