@@ -1,9 +1,8 @@
 bin/
 obj/
+.idea/
+*.DotSettings.user
+*.user
+*.cache
 *.dll
 *.pdb
-*.cache
-*.props
-*.targets
-*.json.user
-project.assets.json
