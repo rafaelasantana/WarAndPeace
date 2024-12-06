@@ -1,0 +1,9 @@
+bin/
+obj/
+*.dll
+*.pdb
+*.cache
+*.props
+*.targets
+*.json.user
+project.assets.json
