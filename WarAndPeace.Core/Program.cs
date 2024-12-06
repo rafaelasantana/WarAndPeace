@@ -4,80 +4,80 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using WarAndPeace.Core.IO;
+using WarAndPeace.Core.Models;
 using WarAndPeace.Core.Processing;
 
 namespace WarAndPeace.Core
 {
-    class Program
+    public static class Program
     {
-        static async Task Main(string[] args)
+        // File handling functions
+        private static readonly Func<string[]> getPossiblePaths = () => new[]
         {
-            // File path checking using lambdas
-            var getPossiblePaths = () => new[]
-            {
-                "war_and_peace.txt",
-                Path.Combine("..", "..", "..", "war_and_peace.txt"),
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "war_and_peace.txt")
-            };
+            "war_and_peace.txt",
+            Path.Combine("..", "..", "..", "war_and_peace.txt"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "war_and_peace.txt")
+        };
 
-            var findExistingFile = (string[] paths) => paths.FirstOrDefault(File.Exists);
-            var getFileSize = (string path) => new FileInfo(path).Length / 1024.0 / 1024.0;
-            
-            var filePath = findExistingFile(getPossiblePaths());
+        private static readonly Func<string[], string> findExistingFile = 
+            paths => paths.FirstOrDefault(File.Exists);
+
+        private static readonly Func<string, double> getFileSize = 
+            path => new FileInfo(path).Length / 1024.0 / 1024.0;
+
+        // Console output functions
+        private static readonly Action<string[]> printMissingFileLocations = paths =>
+        {
+            Console.WriteLine("Could not find war_and_peace.txt in any of these locations:");
+            paths.ToList().ForEach(path => 
+                Console.WriteLine($"- {Path.GetFullPath(path)}"));
+        };
+
+        private static readonly Action<int, double> printStats = (wordCount, seconds) =>
+        {
+            Console.WriteLine("\nProcessing completed!");
+            Console.WriteLine($"Unique words found: {wordCount:N0}");
+            Console.WriteLine($"Time taken: {seconds:F2} seconds");
+        };
+
+        private static readonly Action<IEnumerable<string>> printSampleWords = words =>
+        {
+            Console.WriteLine("\nFirst 10 words in alphabetical order:");
+            words.Take(10).ToList().ForEach(word => Console.WriteLine(word));
+        };
+
+        // File processing function
+        private static readonly Func<string, Task<ProcessingResult>> processFile = async filePath =>
+        {
+            var reader = new FileChunkReader(filePath);
+            var chunks = await reader.ReadChunksAsync();
+            return await ParallelProcessor.ProcessChunksAsync(chunks);
+        };
+
+        public static async Task Main(string[] args)
+        {
+            var paths = getPossiblePaths();
+            var filePath = findExistingFile(paths);
 
             if (filePath == null)
             {
-                Console.WriteLine("Could not find war_and_peace.txt in any of these locations:");
-                getPossiblePaths().ToList().ForEach(path => 
-                    Console.WriteLine($"- {Path.GetFullPath(path)}"));
+                printMissingFileLocations(paths);
                 return;
             }
 
             Console.WriteLine($"Found file at: {Path.GetFullPath(filePath)}");
-            
-            var stopwatch = new Stopwatch();
-            var tokenizer = new WordTokenizer();
-            
+            Console.WriteLine($"File size: {getFileSize(filePath):F2} MB");
+
             try
             {
-                Console.WriteLine($"File size: {getFileSize(filePath):F2} MB");
-
-                stopwatch.Start();
+                var stopwatch = Stopwatch.StartNew();
                 
-                // Process file and get unique words using lambda chain
-                var processFile = async () =>
-                {
-                    var reader = new FileChunkReader(filePath);
-                    var chunks = await reader.ReadChunksAsync();
-                    
-                    return chunks
-                        .SelectMany(chunk => tokenizer.TokenizeChunk(chunk))
-                        .Distinct()
-                        .OrderBy(word => word)
-                        .ToList();
-                };
-
-                var uniqueWords = await processFile();
+                var result = await processFile(filePath);
                 
                 stopwatch.Stop();
-
-                // Print statistics using lambdas
-                var printStats = () =>
-                {
-                    Console.WriteLine("\nProcessing completed!");
-                    Console.WriteLine($"Unique words found: {uniqueWords.Count:N0}");
-                    Console.WriteLine($"Time taken: {stopwatch.ElapsedMilliseconds / 1000.0:F2} seconds");
-                };
-
-                var printSampleWords = () =>
-                {
-                    Console.WriteLine("\nFirst 10 words in alphabetical order:");
-                    uniqueWords.Take(10).ToList().ForEach(word => 
-                        Console.WriteLine(word));
-                };
-
-                printStats();
-                printSampleWords();
+                
+                printStats(result.TotalUniqueWords, stopwatch.ElapsedMilliseconds / 1000.0);
+                printSampleWords(result.UniqueWords);
             }
             catch (Exception ex)
             {

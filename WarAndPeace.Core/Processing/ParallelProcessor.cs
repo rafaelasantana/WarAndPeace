@@ -1,68 +1,54 @@
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using WarAndPeace.Core.Models;
 
 namespace WarAndPeace.Core.Processing
 {
-    public class ParallelProcessor(WordTokenizer tokenizer, int? maxDegreeOfParallelism = null)
+    public static class ParallelProcessor
     {
-        private readonly int _maxDegreeOfParallelism = maxDegreeOfParallelism ?? Environment.ProcessorCount;
-
-        private async Task<IEnumerable<string>> ProcessChunksInParallelAsync(IEnumerable<TextChunk> chunks)
-        {
-            var chunksArray = chunks.ToArray();
-            
-            var tasks = new List<Task<HashSet<string>>>();
-            
-            var parallelOptions = new ParallelOptions 
+        // Configuration function
+        private static readonly Func<int?, ParallelOptions> CreateParallelOptions =
+            maxDegreeOfParallelism => new ParallelOptions 
             { 
-                MaxDegreeOfParallelism = _maxDegreeOfParallelism 
+                MaxDegreeOfParallelism = maxDegreeOfParallelism ?? Environment.ProcessorCount 
             };
 
-            await Parallel.ForEachAsync(
-                chunksArray,
-                parallelOptions,
-                async (chunk, _) =>
-                {
-                    var result = await ProcessChunkTask(chunk);
-                    lock (tasks)
-                    {
-                        tasks.Add(Task.FromResult(result));
-                    }
-                });
+        // Core processing functions
+        private static readonly Func<TextChunk, IEnumerable<string>> ProcessChunk =
+            chunk => WordTokenizer.Tokenize(chunk.Content);
 
-            var wordSets = await Task.WhenAll(tasks);
+        private static readonly Func<IEnumerable<string>, ImmutableHashSet<string>> ToImmutableSet =
+            words => words.ToImmutableHashSet();
 
-            return wordSets
-                .Aggregate(
-                    new HashSet<string>(),
-                    (accumulator, current) =>
-                    {
-                        accumulator.UnionWith(current);
-                        return accumulator;
-                    }
-                )
-                .OrderBy(word => word);
-        }
+        // Timing function
+        private static readonly Func<DateTime, DateTime, double> CalculateProcessingTime =
+            (start, end) => (end - start).TotalMilliseconds;
 
-        private Task<HashSet<string>> ProcessChunkTask(TextChunk chunk) => 
-            Task.Run(() => new HashSet<string>(tokenizer.TokenizeChunk(chunk)));
-
-        public async Task<ProcessingResult> ProcessWithStatisticsAsync(IEnumerable<TextChunk> chunks)
+        // Main processing pipeline
+        public static async Task<ProcessingResult> ProcessChunksAsync(
+            IEnumerable<TextChunk> chunks,
+            int? maxDegreeOfParallelism = null)
         {
-            if (chunks == null)
-                throw new ArgumentNullException(nameof(chunks));
-                
+            var startTime = DateTime.UtcNow;
+            
             try
             {
-                var startTime = DateTime.UtcNow;
-                var words = await ProcessChunksInParallelAsync(chunks);
-                var endTime = DateTime.UtcNow;
+                var parallelOptions = CreateParallelOptions(maxDegreeOfParallelism);
+                var chunksArray = chunks.ToImmutableArray();
 
-                var uniqueWords = words.ToArray();
+                // Process chunks in parallel and collect results
+                var processedSets = await ProcessChunksParallel(chunksArray, parallelOptions);
+                
+                // Combine results
+                var uniqueWords = CombineAndSortResults(processedSets);
+                
+                var endTime = DateTime.UtcNow;
+                
                 return new ProcessingResult
                 {
-                    UniqueWords = uniqueWords.ToList(),
-                    ProcessingTimeMs = (endTime - startTime).TotalMilliseconds,
-                    TotalUniqueWords = uniqueWords.Length
+                    UniqueWords = uniqueWords,
+                    ProcessingTimeMs = CalculateProcessingTime(startTime, endTime),
+                    TotalUniqueWords = uniqueWords.Count
                 };
             }
             catch (Exception ex)
@@ -70,5 +56,34 @@ namespace WarAndPeace.Core.Processing
                 throw new InvalidOperationException("Error processing text chunks", ex);
             }
         }
+
+        // Helper functions for parallel processing
+        private static async Task<ImmutableArray<ImmutableHashSet<string>>> ProcessChunksParallel(
+            ImmutableArray<TextChunk> chunks,
+            ParallelOptions parallelOptions)
+        {
+            var results = new ConcurrentBag<ImmutableHashSet<string>>();
+
+            await Parallel.ForEachAsync(
+                chunks,
+                parallelOptions,
+                async (chunk, _) =>
+                {
+                    var processed = await Task.Run(() => 
+                        ToImmutableSet(ProcessChunk(chunk)));
+                    results.Add(processed);
+                });
+
+            return [..results];
+        }
+
+        private static ImmutableList<string> CombineAndSortResults(
+            ImmutableArray<ImmutableHashSet<string>> processedSets) =>
+            processedSets
+                .Aggregate(
+                    ImmutableHashSet<string>.Empty,
+                    (acc, curr) => acc.Union(curr))
+                .OrderBy(word => word)
+                .ToImmutableList();
     }
 }

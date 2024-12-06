@@ -6,41 +6,48 @@ using WarAndPeace.Core.Models;
 
 namespace WarAndPeace.Core.Processing
 {
-    public class WordTokenizer
+    public static class WordTokenizer
     {
-        private readonly Regex cleanupRegex = new(
-            @"[^\w\s]|\d|_", // Added underscore to removal
+        private static readonly Regex cleanupRegex = new(
+            @"[^\w\s]|\d|_",
             RegexOptions.Compiled
         );
-        
-        private readonly Func<string, string> removePunctuation;
-        private readonly Func<string, string> toLowerCase;
-        private readonly Func<string, bool> isValidWord;
-        private readonly Func<string, string[]> splitIntoWords;
-        
-        public WordTokenizer()
-        {
-            removePunctuation = text => cleanupRegex.Replace(text, "");
-            toLowerCase = text => text.ToLowerInvariant();
-            // Refined word validation: at least 2 characters, only letters
-            isValidWord = word => !string.IsNullOrWhiteSpace(word) 
-                                  && word.Length > 1 
-                                  && word.All(char.IsLetter);
-            splitIntoWords = text => text.Split(
+
+        // Core transformation functions as lambdas
+        private static readonly Func<string, string> removePunctuation = 
+            text => cleanupRegex.Replace(text ?? string.Empty, "");
+            
+        private static readonly Func<string, string> toLowerCase = 
+            text => text?.ToLowerInvariant() ?? string.Empty;
+            
+        private static readonly Func<string, bool> isValidWord = 
+            word => !string.IsNullOrWhiteSpace(word) 
+                    && word.Length > 1 
+                    && word.All(char.IsLetter);
+                
+        private static readonly Func<string, IEnumerable<string>> splitIntoWords = 
+            text => text?.Split(
                 new[] { ' ', '\n', '\r', '\t' }, 
                 StringSplitOptions.RemoveEmptyEntries
-            );
-        }
+            ) ?? Array.Empty<string>();
 
-        public IEnumerable<string> TokenizeChunk(TextChunk chunk) => 
-            TokenizeText(chunk.Content);
-        
-        public IEnumerable<string> TokenizeText(string text) =>
-            string.IsNullOrWhiteSpace(text)
-                ? Enumerable.Empty<string>() 
+        // Composition helpers
+        private static readonly Func<string, IEnumerable<string>> processText =
+            text => string.IsNullOrWhiteSpace(text)
+                ? Enumerable.Empty<string>()
                 : splitIntoWords(text)
                     .Select(removePunctuation)
                     .Select(toLowerCase)
                     .Where(isValidWord);
+
+        // Public API
+        public static IEnumerable<string> Tokenize(string text) =>
+            processText(text);
+
+        // Extension method for chunk processing if needed
+        public static IEnumerable<string> TokenizeChunk(this TextChunk chunk) =>
+            chunk != null
+                ? processText(chunk.Content)
+                : Enumerable.Empty<string>();
     }
 }
