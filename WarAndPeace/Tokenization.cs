@@ -4,11 +4,9 @@ namespace WarAndPeace;
 
 public static class Tokenization
 {
-    public static readonly Func<string, string> RemovePunctuation = text =>
-    {
-        var cleanupRegex = new Regex(@"[^\w\s]|\d|_", RegexOptions.Compiled);
-        return cleanupRegex.Replace(text, "");
-    };
+    public static readonly Regex CleanupRegex = new(@"[^\w\s]|\d|_", RegexOptions.Compiled);
+
+    public static readonly Func<string, string> RemovePunctuation = text => CleanupRegex.Replace(text, "");
 
     public static readonly Func<string, string> ToLower = text => text.ToLowerInvariant();
 

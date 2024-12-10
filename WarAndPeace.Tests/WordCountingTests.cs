@@ -25,7 +25,7 @@ public class WordCountingTests
     {
         var result = WordCounting.CountWords([]);
 
-        await Verifier.Verify(result);
+        await Verify(result);
     }
 
     [Test]

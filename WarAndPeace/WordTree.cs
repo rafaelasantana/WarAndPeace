@@ -16,8 +16,6 @@ public sealed record EmptyNode : WordTree;
 
 public sealed record Node(string Word, NodeColor Color, WordTree Left, WordTree Right) : WordTree;
 
-public sealed record WordCollection(List<string> Words, int Count);
-
 public static class WordTreeOperations
 {
     public static WordTree Empty() => new EmptyNode();
@@ -52,7 +50,6 @@ public static class WordTreeOperations
             return tree switch
             {
                 EmptyNode => new Node(word, Red, new EmptyNode(), new EmptyNode()),
-
                 Node({ } nodeWord, var color, var left, var right) => Compare(word, nodeWord, StringComparison.Ordinal) switch
                 {
                     < 0 => Balance(color, InsertRec(left, word), nodeWord, right),
