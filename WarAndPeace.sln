@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarAndPeace.Core", "WarAndPeace.Core\WarAndPeace.Core.csproj", "{55EAAA39-E187-4E54-A843-8E34145CC2EA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarAndPeace", "WarAndPeace\WarAndPeace.csproj", "{55EAAA39-E187-4E54-A843-8E34145CC2EA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WarAndPeace.Tests", "WarAndPeace.Tests\WarAndPeace.Tests.csproj", "{EF338DC6-8309-4472-955F-A0737ED26F7F}"
 EndProject
