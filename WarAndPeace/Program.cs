@@ -24,4 +24,3 @@ var wordChain = WordCounting.CountWords(fileReadResult.AsT0);
 var saveSuccess = WordChainOperations.SaveWords(wordChain, saveTo);
 
 Console.WriteLine(saveSuccess ? $"{wordChain.Count:N0} words saved to {saveTo}" : "Failed to save words");
-
