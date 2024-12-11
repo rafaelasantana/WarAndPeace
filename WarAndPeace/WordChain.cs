@@ -26,4 +26,7 @@ public static class WordChainOperations
             return false;
         }
     }
+    
+    public static List<string> ToList(WordChain chain) =>
+        [..chain.Words];
 }
