@@ -1,0 +1,15 @@
+﻿[
+  and,
+  brown,
+  dog,
+  fox,
+  jumps,
+  lazy,
+  multiple,
+  over,
+  punctuation,
+  quick,
+  some,
+  spaces,
+  the
+]

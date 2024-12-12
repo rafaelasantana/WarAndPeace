@@ -1,0 +1,18 @@
+﻿{
+  ProcessedWordCount: 5197,
+  SampleWords: [
+    aam,
+    aamt,
+    aamtw,
+    aamtwxfm,
+    aamtwxfmp,
+    aazw,
+    aazwd,
+    aazwdg,
+    aazwdgd,
+    aazwdgdq
+  ],
+  AllWordsAreLowercase: true,
+  AllWordsOnlyLetters: true,
+  AllWordsValidLength: true
+}
