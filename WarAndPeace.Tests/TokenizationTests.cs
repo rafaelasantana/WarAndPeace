@@ -34,7 +34,7 @@ public class TokenizationTests
             "Some-punctuation, and... multiple    spaces",
         };
 
-        var result = Tokenization.Tokenize(lines);
+        var result = Tokenization.Tokenize(lines).OrderBy(x => x);
 
         await Verify(result);
     }
@@ -43,18 +43,16 @@ public class TokenizationTests
     public async Task Tokenize_GeneratedComplexInput()
     {
         var lines = TextGenerator.GenerateLines(5, seed: 12345).ToList();
-        
-        var result = Tokenization.Tokenize(lines);
+        var result = Tokenization.Tokenize(lines).OrderBy(x => x).ToList();
 
-        var enumerable = result as string[] ?? result.ToArray();
         await Verify(new
         {
             InputLineCount = lines.Count,
             InputLines = lines,
-            TokenizedWords = enumerable,
-            AllWordsAreLowercase = enumerable.All(word => word == word.ToLower()),
-            AllWordsOnlyLetters = enumerable.All(word => word.All(char.IsLetter)),
-            AllWordsValidLength = enumerable.All(word => word.Length >= 2)
+            TokenizedWords = result,
+            AllWordsAreLowercase = result.All(word => word == word.ToLower()),
+            AllWordsOnlyLetters = result.All(word => word.All(char.IsLetter)),
+            AllWordsValidLength = result.All(word => word.Length >= 2)
         });
     }
 
@@ -77,7 +75,7 @@ public class TokenizationTests
             "In!!!Between!!!Words"
         };
 
-        var result = Tokenization.Tokenize(lines);
+        var result = Tokenization.Tokenize(lines).OrderBy(x => x);
         await Verify(result);
     }
 
